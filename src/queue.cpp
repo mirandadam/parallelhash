@@ -18,9 +18,10 @@
 
 Queue::Queue()
     {
-    
     queue_first=0;
     queue_count=0;
+
+    assert(queue_size< (MAX_UINT32)/2); //if queue_size is larger than MAX_UINT32/2 some operations may overflow
 
     omp_init_lock(&queue_mutex);
     omp_init_lock(&queue_full_lock);
@@ -29,12 +30,10 @@ Queue::Queue()
     memset (queue, 0, queue_size);
 
     omp_set_lock(&queue_empty_lock);
-    
     }
 
 Queue::~Queue()
     {
-    
     queue_first=0;
     queue_count=0;
 
@@ -43,89 +42,91 @@ Queue::~Queue()
     omp_destroy_lock(&queue_empty_lock);
 
     memset (queue, 0, queue_size);
-    
     }
 
 void Queue::Push(Job *j)
     {
-    
     uint32_t queue_last;
-    bool release_queue_full_lock=false;
 
     assert(0!=j);
 
-    //printf("Trying to push to queue. Queue has %"PRIu32" jobs before pushing.\n",queue_count);//DEBUG
-    omp_set_lock(&queue_full_lock);
     omp_set_lock(&queue_mutex);
 
     assert(queue_count>=0);
-    assert(queue_count<queue_size);
+    assert(queue_count<=queue_size);
     assert(queue_first>=0);
     assert(queue_first<queue_size);
 
-    queue_last=(queue_first+queue_count)%queue_size;
-    //TODO: check for overflows when queue_size>=max_uint/2
+    //if the queue is full, wait for it to have an empty slot
+    if(queue_count==queue_size)
+        {
+        //printf("%p (push) queue_count before=%"PRIu32"\n",this,queue_count);//DEBUG
+        omp_test_lock(&queue_full_lock);
+        omp_unset_lock(&queue_mutex);
+        omp_set_lock(&queue_full_lock);
+        omp_set_lock(&queue_mutex);
+        //printf("%p (push)  queue_count after=%"PRIu32"\n",this,queue_count);//DEBUG
+        }
+
+    assert(queue_count<queue_size);
+
+    queue_last=(queue_first+queue_count)%queue_size; //this will overflow in the absurd case of queue_size>=MAX_UINT32/2
+    //such a high value of queue_size is prevented by an assertion in the constructor
     queue[queue_last]=j;
     queue_count+=1;
-    if (queue_count<queue_size)
-        {
-        release_queue_full_lock=true;
-        }
 
-    //printf("Pushed to queue. Queue has now %"PRIu32" jobs.\n",queue_count);//DEBUG
+    //printf("%p Pushed to queue. Queue has now %"PRIu32" jobs.\n",this, queue_count);//DEBUG
 
-    //Release  queue_full_lock AFTER releasing queue_mutex, even if
-    // we decide whether or not to release queue_full_lock before releasing
-    // queue_mutex.
-    omp_unset_lock(&queue_mutex);
-    if (release_queue_full_lock)
-        {
-        omp_unset_lock(&queue_full_lock);
-        }
+    assert(queue_count>0);
+
     omp_unset_lock(&queue_empty_lock);
+
+    omp_unset_lock(&queue_mutex);
+
     //TODO: test this behaviour.
     // This is meant to lock all PUSHes and allow only a POP after the queue is full.
     // Every pop will release this lock exactly once, so if the queue was full before the pop,
     //   only one PUSH per POP will be allowed afterwards.
 
-    
     }
 
 Job * Queue::Pop()
     {
-    
     Job * j=0;
-    bool release_queue_empty_lock=false;
 
-    omp_set_lock(&queue_empty_lock);
     omp_set_lock(&queue_mutex);
 
-    assert(queue_count>0);
+    assert(queue_count>=0);
     assert(queue_count<=queue_size);
     assert(queue_first>=0);
     assert(queue_first<queue_size);
 
-    if (queue_count>0)
+    //if the queue is empty, wait for it to have a job pending
+    if(queue_count==0)
         {
-        j=queue[queue_first];
-        queue[queue_first]=0;
-        queue_first=(queue_first+1)%queue_size;
-        queue_count-=1;
+        //printf("%p (pop) queue_count before=%"PRIu32"\n",this,queue_count);//DEBUG
+        omp_test_lock(&queue_empty_lock);
+        omp_unset_lock(&queue_mutex);
+        omp_set_lock(&queue_empty_lock);
+        omp_set_lock(&queue_mutex);
+        //printf("%p (pop) queue_count after=%"PRIu32"\n",this,queue_count);//DEBUG
         }
 
-    //printf("Popped from queue. Queue has now %"PRIu32" jobs.\n",queue_count);//DEBUG
+    assert(queue_count>0);
 
-    if (queue_count>0)
-        {
-        release_queue_empty_lock=true;
-        }
+    j=queue[queue_first];
+    queue[queue_first]=0;
+    queue_first=(queue_first+1)%queue_size;
+    queue_count-=1;
+
+    //printf("%p Popped from queue. Queue has now %"PRIu32" jobs.\n",this,queue_count);//DEBUG
+
+    assert(queue_count<queue_size);
+
+    omp_unset_lock(&queue_full_lock);
 
     omp_unset_lock(&queue_mutex);
-    if (release_queue_empty_lock)
-        {
-        omp_unset_lock(&queue_empty_lock);
-        }
-    omp_unset_lock(&queue_full_lock);
+
     //TODO: test this behaviour.
     // This is meant to lock all PUSHes and allow only a POP after the queue is full.
     // Every pop will release this lock exactly once, so if the queue was full before the pop,
@@ -134,21 +135,18 @@ Job * Queue::Pop()
     return j;
     }
 
-
 uint32_t Queue::Get_Capacity()
     {
-    
     return queue_size;
-    
     }
-
 
 /*!
     \fn Queue::Get_Job_Count()
  */
 uint32_t Queue::Get_Job_Count()
     {
-    
+    omp_set_lock(&queue_mutex);
     return queue_count;
-    
+    omp_unset_lock(&queue_mutex);
     }
+
