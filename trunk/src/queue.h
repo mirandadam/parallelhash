@@ -19,6 +19,9 @@
 
 #include <omp.h>
 #include <string.h>
+#define __STDC_LIMIT_MACROS
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
 #include <assert.h>
 #include "job.h"
 
