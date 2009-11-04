@@ -21,7 +21,7 @@ Queue::Queue()
     queue_first=0;
     queue_count=0;
 
-    assert(queue_size< (MAX_UINT32)/2); //if queue_size is larger than MAX_UINT32/2 some operations may overflow
+    assert(queue_size< (UINT32_MAX)/2); //if queue_size is larger than MAX_UINT32/2 some operations may overflow
 
     omp_init_lock(&queue_mutex);
     omp_init_lock(&queue_full_lock);
