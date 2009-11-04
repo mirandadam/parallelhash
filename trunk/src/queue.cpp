@@ -100,7 +100,7 @@ Job * Queue::Pop()
     omp_set_lock(&queue_empty_lock);
     omp_set_lock(&queue_mutex);
 
-    assert(queue_count>=0);
+    assert(queue_count>0);
     assert(queue_count<=queue_size);
     assert(queue_first>=0);
     assert(queue_first<queue_size);
