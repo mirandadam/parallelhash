@@ -14,6 +14,8 @@
  *   along with this program; if not, see <http://www.gnu.org/licenses/>   *
  ***************************************************************************/
 
+#define VERSION "0.1.2"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <omp.h>
@@ -174,21 +176,23 @@ void parse_command_line(int argc, char* argv[])
         if ( 1==argc || 0==strcmp(argv[i],"-h") || 0==strcmp(argv[i],"--help") )
             {
             //TODO: document entire code (doxygen?)
-            printf("WARNING: this version of parallelhash is in BETA stage. Usual warnings and disclaimers apply.\n");
+            printf("parallelhash version "VERSION"\n");
+            printf("WARNING: this version of parallelhash is in ALPHA stage. Usual warnings and disclaimers apply.\n");
             printf("Usage: parallelhash -h|--help\n");
-            printf("       parallelhash [-y|--non-interactive] -i|--input inputfile -a|--hash algorithm,logfile[,chunksize] [-a|--hash algorithm,logfile[,chunksize]] ...  \n");
+            printf("       parallelhash [-y|--non-interactive] [-i|--input inputfile]\n");
+            printf("         -a|--hash algorithm,logfile[,hashwindow] [-a|--hash algorithm,logfile[,hashwindow]] ... \n");
             printf("Hash an input file and write the results in log files.\n");
             printf("\n");
             printf("Command line options:\n");
             printf("    -h --help\n");
-            printf("    -i --input [file name] (use special filename '-' to read from stdin)\n");
+            printf("    -i --input [file name] (use filename '-' or omit this option to read from stdin)\n");
             printf("    -y --non-interactive (default when reading from stdin)\n");
-            printf("    -a --hash [hash algorithm],[log file],[chunk size (optional)]\n");
+            printf("    -a --hash [hash algorithm],[log file],[hashwindow (optional)]\n");
             printf("\n");
             printf("Hash algorithms supported: md5, sha1, sha256 and sha512.\n");
-            printf("Chunk size units supported: K(i)B, M(i)B, G(i)B, T(i)B. The 'B' is optional.\n");
-            printf("Chunk size examples: 1000 (1000 bytes), 1.1M or 1.1MB (1.1*10^6 bytes), 1Mi or 1MiB (2^20 bytes).\n");
-            printf("If a non-zero 'chunk size' is declared, hashes are produced for every chunk of 'chunk size' of the input file.\n");
+            printf("Hashwindow size units supported: K(i)B, M(i)B, G(i)B, T(i)B. The 'B' is optional.\n");
+            printf("Hashwindow examples: 1000 (1000 bytes), 1.1M or 1.1MB (1.1*10^6 bytes), 1Mi or 1MiB (2^20 bytes).\n");
+            printf("If a non-zero 'hashwindow' is declared, hashes are produced for every consecutive chunk of 'hashwindow' bytes of the input file.\n");
             printf("\n");
             printf("Examples:\n");
             printf("    parallelhash -i /dev/sda -a md5,md5_log.txt\n");
@@ -199,15 +203,15 @@ void parse_command_line(int argc, char* argv[])
             printf("Operational constraints:\n");
             printf("    Using the same log file to write two or more logs is not supported.\n");
             printf("    Hashing multiple input files is not (yet?) supported.\n");
-            printf("    This application is designed to use multiple threads. In a single threaded environment, dcfldd may perform better.\n");
+            //printf("    This application is designed to use multiple threads. In a single threaded environment, dcfldd may perform better.\n");
             printf("    Copying the input to another destination is not supported ('of=' dd option).\n");
             printf("    Handling of read errors is not supported. gnuddrescue is a great tool for that.\n");
             printf("\n");
             printf("Miscellaneous notes:\n");
-            printf("    parallelhash was written to hash forensic images faster than dcfldd when calculating multiple hashes simultaneously.\n");
-            printf("    Several hash streams can be specified. For every hash stream an algorithm, a log file and, optionally, a chunk size are declared.\n");
-            printf("    The md5 and sha variants code was imported from GNU Coreutils. The rest of the source code is original.\n");
-            printf("    This is a C++ project using OpenMP for multithreading.\n");
+            //printf("    parallelhash was written to hash forensic images faster than dcfldd when calculating multiple hashes simultaneously.\n");
+            printf("    Several hash streams can be specified. For every hash stream an algorithm, a log file and, optionally, a hashwindow are declared.\n");
+            //printf("    The md5 and sha variants code was imported from GNU Coreutils. The rest of the source code is original.\n");
+            //printf("    This is a C++ project using OpenMP for multithreading.\n");
             exit(0);
             }
         else if ( 0==strcmp(argv[i],"-i") || 0==strcmp(argv[i],"--input") )
