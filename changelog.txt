@@ -1,0 +1,14 @@
+0.1.2 alpha (2009-11-04)
+  - fixed assertion bug
+  - fixed compilation bug
+  - moved source files around
+  - created changelog
+
+0.1 alpha (2009-11-03)
+  - Initial release.
+  - Support for md5, sha1, sha256, sha512
+  - simultaneous hash calculations
+  - configurable partial hashes
+  - separated log files
+  - uses OpenMP
+  - compiles and works in linux
