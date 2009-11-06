@@ -52,9 +52,9 @@ void Queue::Push(Job *j)
 
     omp_set_lock(&queue_mutex);
 
-    assert(queue_count>=0);
+    //assert(queue_count>=0); //this is always true for an unsigned int
     assert(queue_count<=queue_size);
-    assert(queue_first>=0);
+    //assert(queue_first>=0); //this is always true for an unsigned int
     assert(queue_first<queue_size);
 
     //if the queue is full, wait for it to have an empty slot
@@ -96,9 +96,9 @@ Job * Queue::Pop()
 
     omp_set_lock(&queue_mutex);
 
-    assert(queue_count>=0);
+    //assert(queue_count>=0); //this is always true for an unsigned int
     assert(queue_count<=queue_size);
-    assert(queue_first>=0);
+    //assert(queue_first>=0); //this is always true for an unsigned int
     assert(queue_first<queue_size);
 
     //if the queue is empty, wait for it to have a job pending

@@ -44,7 +44,7 @@ uint32_t    hasher_count=0;   //number of hashing streams
 const char* input_filename=0; //name of the input file
 const char  stdin_filename[]={"-"};
 bool        interactive=true; //flag to ask for confirmation before starting
-arg_aux     arguments[MAXIMUM_NUMBER_OF_HASHER_THREADS_PER_READER]={{0}}; //arguments of the streams
+arg_aux     arguments[MAXIMUM_NUMBER_OF_HASHER_THREADS_PER_READER]; //arguments of the streams
 
 void parse_command_line(int argc, char *argv[]);
 
@@ -59,6 +59,7 @@ int main(int argc, char *argv[])
     uint32_t nthreads=0;
     bool     file_opened=true;
 
+    memset(arguments, 0, sizeof(arg_aux));
     parse_command_line(argc, argv);
 
     for(uint32_t i=0;i<Queue::queue_size+2;i++)
