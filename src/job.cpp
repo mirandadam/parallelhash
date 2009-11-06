@@ -74,7 +74,7 @@ uint64_t Job::Set_Data(const uint8_t *new_data, uint64_t new_data_count)
     uint64_t r;
 
     assert(new_data!=0);
-    assert(new_data_count>=0);
+    //assert(new_data_count>=0); //this is always true for an unsigned int
 
     r=data_size;
 

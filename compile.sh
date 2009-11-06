@@ -1,16 +1,19 @@
 #!/bin/bash
 
-GCC=gcc-4.4
-GXX=g++-4.4
+GCC="gcc-4.4"
+GXX="g++-4.4"
+WFLAGS="-Wall -Wextra"
+OFLAGS="-O3 -g0"
+DFLAGS="-O0 -g3"
 
-#degug:
-#$GCC -c -O0 -g2 -Wall -Isrc/lib src/lib/*.c
-#$GXX -c -O0 -g2 -Wall -fopenmp -Isrc -Isrc/lib src/*.cpp
-#$GXX -O0 -g2 -Wall -fopenmp -o parallelhash *.o
+#debug:
+#$GCC $WFLAGS $DFLAGS -c -Isrc/lib src/lib/*.c
+#$GXX $WFLAGS $DFLAGS -fopenmp -c -Isrc -Isrc/lib src/*.cpp
+#$GXX $WFLAGS $DFLAGS -fopenmp -o parallelhash *.o
 
 #standard:
-$GCC -c -O2 -Wall -Isrc/lib src/lib/*.c
-$GXX -c -O2 -Wall -fopenmp -Isrc -Isrc/lib src/*.cpp
-$GXX -O2 -Wall -fopenmp -o parallelhash *.o
+$GCC $WFLAGS $OFLAGS -c -Isrc/lib src/lib/*.c
+$GXX $WFLAGS $OFLAGS -fopenmp -c -Isrc -Isrc/lib src/*.cpp
+$GXX $WFLAGS $OFLAGS -fopenmp -o parallelhash *.o
 
 rm *.o

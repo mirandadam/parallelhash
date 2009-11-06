@@ -87,8 +87,10 @@ bool Reader::Open(const char *filepath)
         else
             {
             file_is_seekable=true;
-            file_size=ftell(fp);
-            assert(file_size>=0);
+            long int i;
+            i=ftell(fp);
+            assert(i>=0); //TODO: fail less abruptly here
+            file_size=i;
             fseek(fp, 0, SEEK_SET);
             }
         }
