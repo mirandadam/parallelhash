@@ -14,7 +14,7 @@
  *   along with this program; if not, see <http://www.gnu.org/licenses/>   *
  ***************************************************************************/
 
-#define VERSION "0.1.2"
+#define VERSION "0.1.2_svn"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -34,10 +34,12 @@
 
 typedef struct
     {
-    char     *arg1;
-    char     *arg2;
-    char     *arg3;
-    uint64_t chunk_size;
+    char     *arg1; //hash algorithm
+    char     *arg2; //log file
+    char     *arg3; //hashwindow
+    char     *arg4; //"w[indowed]" or "p[artial]"for windowed hash only (do not calculate full hash)
+    uint64_t hashwindow;
+    bool     windowed_only;
     } arg_aux;
 
 uint32_t    hasher_count=0;   //number of hashing streams
@@ -94,7 +96,7 @@ int main(int argc, char *argv[])
         hasher_pool[i]->Set_Queue(queue_pool[i]);
         hasher_pool[i]->Set_Processed_Flag_Mask(1<<i);
         hasher_pool[i]->Set_Hashed_Stream_Name(input_filename);
-        hasher_pool[i]->Set_Fragment_Size(arguments[i].chunk_size);
+        hasher_pool[i]->Set_Fragment_Size(arguments[i].hashwindow);
         file_opened=hasher_pool[i]->Open(arguments[i].arg2);
         if(! file_opened)
             {
@@ -165,6 +167,113 @@ int main(int argc, char *argv[])
     return 0;
     }
 
+
+uint64_t parse_hashwindow ( char *arg3 )
+    {
+    size_t   s1=0;
+    size_t   s2=0;
+    size_t   s3=0;
+    char     *suffix=0;
+    uint64_t multiplier=1;
+    uint64_t hashwindow=0;
+
+    s1=strspn ( arg3,".1234567890" );
+    s2=strlen ( arg3 );
+    assert ( s2>=s1 );
+    //if there is a suffix, calculate the multiplyer:
+    if ( s2>s1 )
+        {
+        s3=s2-s1;
+        //ignore optional "B" at the end
+        if ( 'B'==arg3[s2-1] || 'b'==arg3[s2-1] )
+            {
+            s3--;
+            }
+        suffix=arg3+s1;
+        if ( suffix[0]=='K' || suffix[0]=='k' )
+            {
+            if ( suffix[1]=='i' && 2==s3 )
+                {
+                multiplier=1024L;
+                }
+            else if ( 1==s3 )
+                {
+                multiplier=1000L;
+                }
+            else multiplier=0;
+            }
+        else if ( suffix[0]=='M' || suffix[0]=='m' )
+            {
+            if ( suffix[1]=='i' && 2==s3 )
+                {
+                multiplier=1024L*1024L;
+                }
+            else if ( 1==s3 )
+                {
+                multiplier=1000L*1000L;
+                }
+            else multiplier=0;
+            }
+        else if ( suffix[0]=='G' || suffix[0]=='g' )
+            {
+            if ( suffix[1]=='i' && 2==s3 )
+                {
+                multiplier=1024L*1024L*1024L;
+                }
+            else if ( 1==s3 )
+                {
+                multiplier=1000L*1000L*1000L;
+                }
+            else multiplier=0;
+            }
+        else if ( suffix[0]=='T' || suffix[0]=='t' )
+            {
+            if ( suffix[1]=='i' && 2==s3 )
+                {
+                multiplier=1024L*1024L*1024L*1024L;
+                }
+            else if ( 1==s3 )
+                {
+                multiplier=1000L*1000L*1000L*1000L;
+                }
+            else multiplier=0;
+            }
+        else
+            {
+            multiplier=0;
+            }
+        }
+
+    //if the multiplier is zero, something went wrong
+    if ( 0==multiplier )
+        {
+        //error - unknown suffix
+        printf ( "Error. Unable to parse:%s\n",arg3 );
+        exit ( 1 );
+        }
+    arg3[s1]='\0';
+    //testing for floating point:
+    if ( 0!=strchr ( arg3,'.' ) )
+        {
+        double d;
+        sscanf ( arg3,"%lf",&d );
+        if ( d<=0 )
+            {
+            //error - negative or floating point zero chunk size.
+            printf ( "Error. Negative or floating point zero chunk size:%s\n",arg3 );
+            exit ( 1 );
+            }
+        hashwindow=d*multiplier;
+        }
+    else
+        {
+        uint64_t u;
+        sscanf ( arg3,"%"PRIu64,&u );
+        hashwindow=u*multiplier;
+        }
+    return hashwindow;
+    }
+
 #define max(x,y) ((x)>(y) ? (x) : (y))
 
 void parse_command_line(int argc, char* argv[])
@@ -182,6 +291,8 @@ void parse_command_line(int argc, char* argv[])
             printf("Usage: parallelhash -h|--help\n");
             printf("       parallelhash [-y|--non-interactive] [-i|--input inputfile]\n");
             printf("         -a|--hash algorithm,logfile[,hashwindow] [-a|--hash algorithm,logfile[,hashwindow]] ... \n");
+            printf("       parallelhash [-y|--non-interactive] [-i|--input inputfile]\n");
+            printf("         --md5|--sha1|--sha256|--sha512 logfile[,hashwindow] [--md5|--sha1|--sha256|--sha512 logfile[,hashwindow]] ... \n");
             printf("Hash an input file and write the results in log files.\n");
             printf("\n");
             printf("Command line options:\n");
@@ -199,6 +310,7 @@ void parse_command_line(int argc, char* argv[])
             printf("    parallelhash -i /dev/sda -a md5,md5_log.txt\n");
             printf("    parallelhash -i file.bin -a md5,md5_log.txt,1MiB\n");
             printf("    parallelhash -i image.iso -a sha1,hash.log,10000000 -a sha256,256log.txt -y\n");
+            printf("    parallelhash -i image.iso --sha1 hash.log,10000000 --sha256 256log.txt -y\n");
             printf("\n");
             printf("\n");
             printf("Operational constraints:\n");
@@ -241,24 +353,24 @@ void parse_command_line(int argc, char* argv[])
             }
         else if ( 0==strcmp(argv[i],"-a") || 0==strcmp(argv[i],"--hash") )
             {
+            if (i+1>=argc)
+                {
+                //error - missing argument for option.
+                printf("Error. Missing argument for option %s.\n",argv[i]);
+                exit(1);
+                }
 
             if (hasher_count>=MAXIMUM_NUMBER_OF_HASHER_THREADS_PER_READER)
                 {
                 //error - excess threads.
-                printf("Error. Maximum number of hasher threads exceeded. Use option -a or --hash at most %i times.\n",MAXIMUM_NUMBER_OF_HASHER_THREADS_PER_READER);
-                exit(1);
-                }
-
-            if (i+1>=argc)
-                {
-                //error - missing argument for option.
-                printf("Error. Missing argument for option %s. Use %s [hash algorithm],[log file],[chunk size (optional)]\n",argv[i],argv[i]);
+                printf("Error. Maximum number of hasher threads exceeded.\n");
                 exit(1);
                 }
 
             char *arg1=0;
             char *arg2=0;
             char *arg3=0;
+            char *arg4=0;
             arg1=argv[i+1];
             arg2=strchr(arg1,',');
             if (0!=arg2)
@@ -270,12 +382,64 @@ void parse_command_line(int argc, char* argv[])
                     {
                     arg3[0]='\0';
                     arg3=arg3+1;
+                    arg4=strchr(arg3,',');
+                    if (0!=arg4)
+                        {
+                        arg4[0]='\0';
+                        arg4=arg4+1;
+                        }
                     }
                 }
-            //printf("%s %s %s %s\n",argv[i],arg1,arg2,arg3); //DEBUG
+
             arguments[hasher_count].arg1=arg1;
             arguments[hasher_count].arg2=arg2;
             arguments[hasher_count].arg3=arg3;
+            arguments[hasher_count].arg4=arg4;
+            hasher_count++;
+            i++;
+            }
+        else if ( 0==strcmp(argv[i],"--md5") ||
+                  0==strcmp(argv[i],"--sha1") ||
+                  0==strcmp(argv[i],"--sha256") ||
+                  0==strcmp(argv[i],"--sha512"))
+            {
+            if (i+1>=argc)
+                {
+                //error - missing argument for option.
+                printf("Error. Missing argument for option %s.\n",argv[i]);
+                exit(1);
+                }
+
+            if (hasher_count>=MAXIMUM_NUMBER_OF_HASHER_THREADS_PER_READER)
+                {
+                //error - excess threads.
+                printf("Error. Maximum number of hasher threads exceeded.\n");
+                exit(1);
+                }
+
+            char *arg1=0;
+            char *arg2=0;
+            char *arg3=0;
+            char *arg4=0;
+            arg1=argv[i]+2;
+            arg2=argv[i+1];
+            arg3=strchr(arg2,',');
+            if (0!=arg3)
+                {
+                arg3[0]='\0';
+                arg3=arg3+1;
+                arg4=strchr(arg3,',');
+                if (0!=arg4)
+                    {
+                    arg4[0]='\0';
+                    arg4=arg4+1;
+                    }
+                }
+
+            arguments[hasher_count].arg1=arg1;
+            arguments[hasher_count].arg2=arg2;
+            arguments[hasher_count].arg3=arg3;
+            arguments[hasher_count].arg4=arg4;
             hasher_count++;
             i++;
             }
@@ -293,19 +457,19 @@ void parse_command_line(int argc, char* argv[])
     if(0==hasher_count)
             {
             //error - no hash stream declared
-            printf("Error. No hash stream declared. Use -a or --hash [hash algorithm],[log file],[chunk size (optional)]\n");
+            printf("Error. No hash stream declared.\n");
             exit(1);
             }
 
     for (uint32_t i=0;i<hasher_count;i++)
         {
-        //printf("%s %s %s %"PRIu64"\n",arguments[i].arg1,arguments[i].arg2,arguments[i].arg3,arguments[i].chunk_size); //DEBUG
+        //printf("%s %s %s %"PRIu64"\n",arguments[i].arg1,arguments[i].arg2,arguments[i].arg3,arguments[i].hashwindow); //DEBUG
 
         //check for presence of required parameters
         if (0==arguments[i].arg1 || 0==arguments[i].arg2)
             {
             //error - missing parameter for hash
-            printf("Error. -a and --hash require two or three arguments in the form --hash [hash algorithm],[log file],[chunk size (optional)]\n");
+            printf("Error. -a and --hash require arguments.\n");
             exit(1);
             }
 
@@ -317,7 +481,10 @@ void parse_command_line(int argc, char* argv[])
             }
 
         //check for supported algorithm
-        if ( 0!=strcmp("md5",arguments[i].arg1) && 0!=strcmp("sha1",arguments[i].arg1) && 0!=strcmp("sha256",arguments[i].arg1) && 0!=strcmp("sha512",arguments[i].arg1) )
+        if ( 0!=strcmp("md5",arguments[i].arg1) &&
+             0!=strcmp("sha1",arguments[i].arg1) &&
+             0!=strcmp("sha256",arguments[i].arg1) &&
+             0!=strcmp("sha512",arguments[i].arg1) )
             {
             //error - unsupported algorithm
             printf("Error. Algorithm not supported:%s",arguments[i].arg1);
@@ -335,109 +502,7 @@ void parse_command_line(int argc, char* argv[])
             }
         if (has_arg3)
             {
-            size_t   s1=0;
-            size_t   s2=0;
-            size_t   s3=0;
-            char     *suffix=0;
-            uint64_t multiplier=1;
-
-            s1=strspn(arguments[i].arg3,".1234567890");
-            s2=strlen(arguments[i].arg3);
-            //printf("%s %"PRIu64" %"PRIu64"\n",arguments[i].arg3, s1, s2); //DEBUG
-            assert(s2>=s1);
-            //if there is a suffix, calculate the multiplyer:
-            if (s2>s1)
-                {
-                s3=s2-s1;
-                //ignore optional "B" at the end
-                if ('B'==arguments[i].arg3[s2-1] || 'b'==arguments[i].arg3[s2-1])
-                    {
-                    s3--;
-                    }
-                suffix=arguments[i].arg3+s1;
-                switch (suffix[0])
-                    {
-                    case('K'):
-                    case('k'):
-                        if (suffix[1]=='i' && 2==s3)
-                            {
-                            multiplier=1024L;
-                            }
-                        else if (1==s3)
-                            {
-                            multiplier=1000L;
-                            }
-                       else multiplier=0;
-                       break;
-                    case('M'):
-                    case('m'):
-                        if (suffix[1]=='i' && 2==s3)
-                            {
-                            multiplier=1024L*1024L;
-                            }
-                        else if (1==s3)
-                            {
-                            multiplier=1000L*1000L;
-                            }
-                        else multiplier=0;
-                        break;
-                    case('G'):
-                    case('g'):
-                        if (suffix[1]=='i' && 2==s3)
-                            {
-                            multiplier=1024L*1024L*1024L;
-                            }
-                        else if (1==s3)
-                            {
-                            multiplier=1000L*1000L*1000L;
-                            }
-                        else multiplier=0;
-                        break;
-                    case('T'):
-                    case('t'):
-                        if (suffix[1]=='i' && 2==s3)
-                            {
-                            multiplier=1024L*1024L*1024L*1024L;
-                            }
-                        else if (1==s3)
-                            {
-                            multiplier=1000L*1000L*1000L*1000L;
-                            }
-                        else multiplier=0;
-                        break;
-                    default:
-                        multiplier=0;
-                        break;
-                    }
-                }
-
-            //if the multiplier is zero, something went wrong
-            if(0==multiplier)
-                {
-                //error - unknown suffix
-                printf("Error. Unable to parse:%s\n",arguments[i].arg3);
-                exit(1);
-                }
-            arguments[i].arg3[s1]='\0';
-            //testing for floating point:
-            if(0!=strchr(arguments[i].arg3,'.'))
-                {
-                double d;
-                sscanf(arguments[i].arg3,"%lf",&d);
-                if(d<=0)
-                    {
-                    //error - negative or floating point zero chunk size.
-                    printf("Error. Negative or floating point zero chunk size:%s\n",arguments[i].arg3);
-                    exit(1);
-                    }
-                arguments[i].chunk_size=d*multiplier;
-                }
-            else
-                {
-                uint64_t u;
-                sscanf(arguments[i].arg3,"%"PRIu64,&u);
-                arguments[i].chunk_size=u*multiplier;
-                }
+            arguments[i].hashwindow=parse_hashwindow(arguments[i].arg3);
             }
 
         }
@@ -451,6 +516,7 @@ void parse_command_line(int argc, char* argv[])
             if( 0==strcmp(arguments[i].arg2,arguments[j].arg2) )
                 {
                 printf("Error. Recording two different logs to the same log file is not supported. Repeated log file: %s\n",arguments[j].arg2);
+                exit(1);
                 }
             }
         }
@@ -464,17 +530,21 @@ void parse_command_line(int argc, char* argv[])
     //asking for confirmation by default, except if reading from stdin
     if(interactive && 0!=strcmp(input_filename,"-"))
         {
-        uint32_t l1=0,l2=0,l3=0;
+        uint32_t l1=0,l2=0,l3=0,l4=0;
         char temp[64]={0};
-        int c=0;
+        char c='\0';
 
         //calculating how much space is necessary for printing the data.
         for (uint32_t i=0;i<hasher_count;i++)
             {
             l1=max(l1,strlen(arguments[i].arg1));
             l2=max(l2,strlen(arguments[i].arg2));
-            snprintf(temp,64,"%"PRIu64,arguments[i].chunk_size);
+            snprintf(temp,64,"%"PRIu64,arguments[i].hashwindow); //DEBUG
             l3=max(l3,strlen(temp));
+            if(arguments[i].arg4!=0)
+                {
+                l4=max(l4,strlen(arguments[i].arg4));
+                }
             }
 
         printf("(use -y or --non-interactive to suppress this prompt)\n");
@@ -482,15 +552,19 @@ void parse_command_line(int argc, char* argv[])
         printf("Hash streams:\n");
         for (uint32_t i=0;i<hasher_count;i++)
             {
-            printf(" %-*s %-*s ",l1,arguments[i].arg1,l2,arguments[i].arg2);
-            if(arguments[i].chunk_size>0)
+            printf(" %-*s  %-*s  ",l1,arguments[i].arg1,l2,arguments[i].arg2);
+            if(arguments[i].hashwindow>0)
                 {
-                printf("%*"PRIu64,l3,arguments[i].chunk_size);
+                printf("%*"PRIu64,l3,arguments[i].hashwindow);
+                if(arguments[i].arg4!=0)
+                    {
+                    printf("  %-*s",l4,arguments[i].arg4);
+                    }
                 }
             printf("\n");
             }
         printf("Existing logs will be overwritten. Do you wish to continue? (y/n)\n");
-        c=getchar();
+        scanf("%c",&c);
         if('y'!=c && 'Y'!=c)
             {
             exit(1);
