@@ -26,17 +26,32 @@ Hasher_SHA256::~Hasher_SHA256()
     {
     }
 
-void Hasher_SHA256::Update_State(const uint8_t* data, uint64_t data_size)
+void Hasher_SHA256::Update_Full_State(const uint8_t* data, uint64_t data_size)
     {
-    sha256_process_bytes(data, data_size, &state);
+    sha256_process_bytes(data, data_size, &full_state);
     }
 
-void Hasher_SHA256::Calculate_Hash()
+void Hasher_SHA256::Update_Window_State(const uint8_t* data, uint64_t data_size)
     {
-    sha256_finish_ctx(&state, result);
+    sha256_process_bytes(data, data_size, &window_state);
     }
 
-void Hasher_SHA256::Reset_Hash_State()
+void Hasher_SHA256::Calculate_Full_Hash()
     {
-    sha256_init_ctx(&state);
+    sha256_finish_ctx(&full_state, full_result);
+    }
+
+void Hasher_SHA256::Calculate_Window_Hash()
+    {
+    sha256_finish_ctx(&window_state, window_result);
+    }
+
+void Hasher_SHA256::Reset_Full_Hash_State()
+    {
+    sha256_init_ctx(&full_state);
+    }
+
+void Hasher_SHA256::Reset_Window_Hash_State()
+    {
+    sha256_init_ctx(&window_state);
     }

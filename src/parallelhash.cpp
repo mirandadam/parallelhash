@@ -14,7 +14,7 @@
  *   along with this program; if not, see <http://www.gnu.org/licenses/>   *
  ***************************************************************************/
 
-#define VERSION "0.1.2_svn"
+#define VERSION "0.2"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,7 +39,7 @@ typedef struct
     char     *arg3; //hashwindow
     char     *arg4; //"w[indowed]" or "p[artial]"for windowed hash only (do not calculate full hash)
     uint64_t hashwindow;
-    bool     windowed_only;
+    bool     window_only;
     } arg_aux;
 
 uint32_t    hasher_count=0;   //number of hashing streams
@@ -93,11 +93,17 @@ int main(int argc, char *argv[])
             hasher_pool[i]=new Hasher_SHA512();
             }
 
-        hasher_pool[i]->Set_Queue(queue_pool[i]);
-        hasher_pool[i]->Set_Processed_Flag_Mask(1<<i);
-        hasher_pool[i]->Set_Hashed_Stream_Name(input_filename);
-        hasher_pool[i]->Set_Fragment_Size(arguments[i].hashwindow);
-        file_opened=hasher_pool[i]->Open(arguments[i].arg2);
+        file_opened=hasher_pool[i]->Configure(input_filename,
+                                              arguments[i].arg2,
+                                              arguments[i].hashwindow,
+                                              arguments[i].window_only,
+                                              queue_pool[i],
+                                              1<<i);
+        //hasher_pool[i]->Set_Queue(queue_pool[i]);
+        //hasher_pool[i]->Set_Processed_Flag_Mask(1<<i);
+        //hasher_pool[i]->Set_Hashed_Stream_Name(input_filename);
+        //hasher_pool[i]->Set_Window_Size(arguments[i].hashwindow);
+        //file_opened=hasher_pool[i]->Open(arguments[i].arg2);
         if(! file_opened)
             {
             printf("Error opening file for writing: %s\n",arguments[i].arg2);
@@ -290,27 +296,34 @@ void parse_command_line(int argc, char* argv[])
             printf("WARNING: this version of parallelhash is in ALPHA stage. Usual warnings and disclaimers apply.\n");
             printf("Usage: parallelhash -h|--help\n");
             printf("       parallelhash [-y|--non-interactive] [-i|--input inputfile]\n");
-            printf("         -a|--hash algorithm,logfile[,hashwindow] [-a|--hash algorithm,logfile[,hashwindow]] ... \n");
+            printf("         -a|--hash algorithm,logfile[,hashwindow] [-a|--hash algorithm,logfile[,hashwindow[,w]]] ... \n");
             printf("       parallelhash [-y|--non-interactive] [-i|--input inputfile]\n");
-            printf("         --md5|--sha1|--sha256|--sha512 logfile[,hashwindow] [--md5|--sha1|--sha256|--sha512 logfile[,hashwindow]] ... \n");
+            printf("         --algorithm logfile[,hashwindow[,w]] [--algorithm logfile[,hashwindow[,w]]] ... \n");
             printf("Hash an input file and write the results in log files.\n");
             printf("\n");
             printf("Command line options:\n");
             printf("    -h --help\n");
             printf("    -i --input [file name] (use filename '-' or omit this option to read from stdin)\n");
             printf("    -y --non-interactive (default when reading from stdin)\n");
-            printf("    -a --hash [hash algorithm],[log file],[hashwindow (optional)]\n");
+            printf("    -a|--hash algorithm,logfile[,hashwindow[,w]]]\n");
+            printf("    --algorithm logfile[,hashwindow[,w]]\n");
             printf("\n");
-            printf("Hash algorithms supported: md5, sha1, sha256 and sha512.\n");
+            printf("Valid values for algorithm: md5, sha1, sha256 and sha512.\n");
+            printf("Optional flag 'w' skips calculation of the full file hash. Only the hashes of individual parts are calculated.\n");
+            printf("Flag 'w' can also be set with 'windowed', 'p' and 'partial'.\n");
             printf("Hashwindow size units supported: K(i)B, M(i)B, G(i)B, T(i)B. The 'B' is optional.\n");
             printf("Hashwindow examples: 1000 (1000 bytes), 1.1M or 1.1MB (1.1*10^6 bytes), 1Mi or 1MiB (2^20 bytes).\n");
             printf("If a non-zero 'hashwindow' is declared, hashes are produced for every consecutive chunk of 'hashwindow' bytes of the input file.\n");
             printf("\n");
             printf("Examples:\n");
             printf("    parallelhash -i /dev/sda -a md5,md5_log.txt\n");
+            printf("    parallelhash -i /dev/sda --hash md5,md5_log.txt\n");
             printf("    parallelhash -i file.bin -a md5,md5_log.txt,1MiB\n");
             printf("    parallelhash -i image.iso -a sha1,hash.log,10000000 -a sha256,256log.txt -y\n");
             printf("    parallelhash -i image.iso --sha1 hash.log,10000000 --sha256 256log.txt -y\n");
+            printf("    parallelhash -i disk.dd --sha1 sha1.log,1Gi,w\n");
+            printf("    parallelhash -i disk.dd --sha1 sha1.log,1Gi,p\n");
+            printf("    head -c 1M /dev/zero | parallelhash --sha512 hash.txt,100K,windowed\n");
             printf("\n");
             printf("\n");
             printf("Operational constraints:\n");
@@ -320,9 +333,9 @@ void parse_command_line(int argc, char* argv[])
             printf("    Copying the input to another destination is not supported ('of=' dd option).\n");
             printf("    Handling of read errors is not supported. gnuddrescue is a great tool for that.\n");
             printf("\n");
-            printf("Miscellaneous notes:\n");
+            //printf("Miscellaneous notes:\n");
             //printf("    parallelhash was written to hash forensic images faster than dcfldd when calculating multiple hashes simultaneously.\n");
-            printf("    Several hash streams can be specified. For every hash stream an algorithm, a log file and, optionally, a hashwindow are declared.\n");
+            //printf("    Several hash streams can be specified. For every hash stream an algorithm, a log file and, optionally, a hashwindow are declared.\n");
             //printf("    The md5 and sha variants code was imported from GNU Coreutils. The rest of the source code is original.\n");
             //printf("    This is a C++ project using OpenMP for multithreading.\n");
             exit(0);
@@ -503,6 +516,15 @@ void parse_command_line(int argc, char* argv[])
         if (has_arg3)
             {
             arguments[i].hashwindow=parse_hashwindow(arguments[i].arg3);
+            }
+
+        if (0!=arguments[i].arg4)
+            {
+            if (0==strcmp("p",arguments[i].arg4) || strcmp("partial",arguments[i].arg4) ||
+                0==strcmp("w",arguments[i].arg4) || strcmp("windowed",arguments[i].arg4))
+                {
+                arguments[i].window_only=true;
+                }
             }
 
         }

@@ -28,11 +28,15 @@ class Hasher_SHA512: public Hasher
         virtual ~Hasher_SHA512();
 
     protected:
-        virtual void Update_State(const uint8_t* data, uint64_t data_size);
-        virtual void Calculate_Hash();
-        virtual void Reset_Hash_State();
+        virtual void Update_Full_State(const uint8_t* data, uint64_t data_size);
+        virtual void Update_Window_State(const uint8_t* data, uint64_t data_size);
+        virtual void Calculate_Full_Hash();
+        virtual void Calculate_Window_Hash();
+        virtual void Reset_Full_Hash_State();
+        virtual void Reset_Window_Hash_State();
 
-        sha512_ctx state;
+        sha512_ctx full_state;
+        sha512_ctx window_state;
 
     private:
 
