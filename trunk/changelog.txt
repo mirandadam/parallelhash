@@ -1,7 +1,10 @@
-SVN
+0.2 alpha (2009-11-08)
   - fixed warnings that were still present with -Wextra
   - added support for command line options --md5, --sha1, etc.
-  - beginning to implement logging of both the partial and the full hash of a file in the same logfile.
+  - logging of both the partial and the full hash of a file in the same logfile is now supported and is the default.
+  - added flag "w" to force windowed only mode and skip calculation of the whole file hash.
+  - a lot of structural changes to accomodate the previous feature.
+  - changed terminology from chunk size to hashwindow.
 
 0.1.2 alpha (2009-11-04)
   - fixed assertion bug

@@ -3,7 +3,7 @@
 GCC="gcc-4.4"
 GXX="g++-4.4"
 WFLAGS="-Wall -Wextra"
-OFLAGS="-O3 -g0"
+OFLAGS="-O3 -g0 -mtune=native"
 DFLAGS="-O0 -g3"
 
 #debug:

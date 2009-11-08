@@ -26,17 +26,32 @@ Hasher_MD5::~Hasher_MD5()
     {
     }
 
-void Hasher_MD5::Update_State(const uint8_t* data, uint64_t data_size)
+void Hasher_MD5::Update_Full_State(const uint8_t* data, uint64_t data_size)
     {
-    md5_process_bytes(data, data_size, &state);
+    md5_process_bytes(data, data_size, &full_state);
     }
 
-void Hasher_MD5::Calculate_Hash()
+void Hasher_MD5::Update_Window_State(const uint8_t* data, uint64_t data_size)
     {
-    md5_finish_ctx(&state, result);
+    md5_process_bytes(data, data_size, &window_state);
     }
 
-void Hasher_MD5::Reset_Hash_State()
+void Hasher_MD5::Calculate_Full_Hash()
     {
-    md5_init_ctx(&state);
+    md5_finish_ctx(&full_state, full_result);
+    }
+
+void Hasher_MD5::Calculate_Window_Hash()
+    {
+    md5_finish_ctx(&window_state, window_result);
+    }
+
+void Hasher_MD5::Reset_Full_Hash_State()
+    {
+    md5_init_ctx(&full_state);
+    }
+
+void Hasher_MD5::Reset_Window_Hash_State()
+    {
+    md5_init_ctx(&window_state);
     }

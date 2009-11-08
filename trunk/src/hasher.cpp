@@ -20,7 +20,8 @@ const char Hasher::hash_name[][7]={"none","md5","sha1","sha256","sha512"};
 
 Hasher::Hasher()
     {
-    memset (result,0,maximum_hash_result_size);
+    memset (full_result,0,maximum_hash_result_size);
+    memset (window_result,0,maximum_hash_result_size);
 
     queue=0;
     fp=0;
@@ -28,9 +29,10 @@ Hasher::Hasher()
     memset (hashed_stream_name, 0, hashed_stream_name_size);
 
     read_count=0;
-    fragment_count=0;
-    fragment_size=0; //Default - entire stream.
+    window_count=0;
+    window_size=0; //Default - entire stream.
     processed_flag_mask=0;
+    windowed_only=false;
 
     hash_algorithm=none;
     hash_size_bytes=0;
@@ -53,21 +55,21 @@ void Hasher::Set_Queue(Queue *q)
     queue=q;
     }
 
-void Hasher::Set_Processed_Flag_Mask(uint64_t mask)
+void Hasher::Set_Processed_Flag_Mask(uint64_t thread_processed_flag)
     {
     uint64_t i;
     uint32_t j;
     //counting the bits set in the mask:
     j=0;
 
-    for (i=mask; 0!=i; i=i>>1)
+    for (i=thread_processed_flag; 0!=i; i=i>>1)
         {
         j=j+(i & 1);
         }
 
     assert(1==j); //exactly one bit set.
 
-    processed_flag_mask=mask;
+    processed_flag_mask=thread_processed_flag;
     }
 
 bool Hasher::Open(const char *filepath)
@@ -78,11 +80,11 @@ bool Hasher::Open(const char *filepath)
     return r;
     }
 
-void Hasher::Set_Fragment_Size(uint64_t frag_size)
+void Hasher::Set_Window_Size(uint64_t win_size)
     {
     //0 means entire stream.
     //any other value means the size of the data to be hashed separately.
-    fragment_size=frag_size;
+    window_size=win_size;
     }
 
 void Hasher::Start()
@@ -97,12 +99,14 @@ void Hasher::Start()
     assert(0!=fp);
     assert(0==ferror(fp));
     assert(0!=processed_flag_mask);
+    assert(! (0==window_size && windowed_only));
 
     Write_Header();
 
-    Reset_Hash_State();
+    Reset_Window_Hash_State();
+    Reset_Full_Hash_State();
     read_count=0;
-    fragment_count=0;
+    window_count=0;
 
     do
         {
@@ -111,31 +115,31 @@ void Hasher::Start()
 
         if (job_data_size>0)
             {
-            if (fragment_size>0)
+            if (window_size>0)
                 {
                 c=0;
                 //TODO: check this.
 
-                while (read_count+job_data_size-c >= (fragment_count+1)*fragment_size)
+                while (read_count+job_data_size-c >= (window_count+1)*window_size)
                     {
-                    fragment_count+=1;
-                    l=(fragment_count*fragment_size)-read_count;
-                    //printf("mask %"PRIu64" fragment_count %"PRIu64" c %"PRIu64" l %"PRIu64" job_data_size %"PRIu64" read_count %"PRIu64"\n",processed_flag_mask,fragment_count, c, l, job_data_size, read_count); //DEBUG
-                    Update_State(job_data+c,l);
+                    window_count+=1;
+                    l=(window_count*window_size)-read_count;
+                    //printf("mask %"PRIu64" window_count %"PRIu64" c %"PRIu64" l %"PRIu64" job_data_size %"PRIu64" read_count %"PRIu64"\n",processed_flag_mask,window_count, c, l, job_data_size, read_count); //DEBUG
+                    Update_States(job_data+c,l);
                     c+=l;
                     read_count+=l;
-                    Calculate_Hash();
-                    Write_Hash();
-                    Reset_Hash_State();
+                    Calculate_Window_Hash();
+                    Write_Window_Hash();
+                    Reset_Window_Hash_State();
                     }
 
-                Update_State(job_data+c, job_data_size-c);
+                Update_States(job_data+c, job_data_size-c);
 
                 read_count+=job_data_size-c;
                 }
             else
                 {
-                Update_State(job_data, job_data_size);
+                Update_States(job_data, job_data_size);
                 read_count=read_count+job_data_size;
                 }
             }
@@ -144,36 +148,40 @@ void Hasher::Start()
         }
     while (job_data_size>0);
 
-    //printf("fragment size %lld fragment count %lld, fs*fc %lld, read_count %lld\n", fragment_size, fragment_count, fragment_size*fragment_count, read_count); //DEBUG
+    //printf("fragment size %lld fragment count %lld, fs*fc %lld, read_count %lld\n", window_size, window_count, window_size*window_count, read_count); //DEBUG
 
-    if (fragment_size>0)
+    if (window_size>0)
         {
-        assert(fragment_size*fragment_count <= read_count);
-
-        if (fragment_size*fragment_count< read_count)
+        assert(window_size*window_count <= read_count);
+        if (window_size*window_count< read_count)
             {
-            Calculate_Hash();
-            Write_Hash();
+            Calculate_Window_Hash();
+            Write_Window_Hash();
             }
+        }
+
+    if( ! windowed_only )
+        {
+        Calculate_Full_Hash();
+        Write_Full_Hash();
         }
     else
         {
-        Calculate_Hash();
-        Write_Hash();
+        Write_Window_Hash_Footer();
         }
     }
 
-void Hasher::Set_Hashed_Stream_Name(const char *name)
+void Hasher::Set_Hashed_Stream_Name(const char *stream_name)
     {
     int32_t m;
-    assert(0!=name);
-    m=strlen(name);
+    assert(0!=stream_name);
+    m=strlen(stream_name);
     assert(m>=0);
     assert((uint32_t)m < hashed_stream_name_size);
     //TODO: fail softer when stream name too long.
     //TODO: fail softer when assertions fail - at least close open files.
 
-    memcpy(hashed_stream_name,name,m);
+    memcpy(hashed_stream_name,stream_name,m);
     memset(hashed_stream_name+m,0,hashed_stream_name_size-m);
     }
 
@@ -187,11 +195,12 @@ void Hasher::Write_Header()
     }
 
 
-void Hasher::Write_Hash()
+void Hasher::Write_Window_Hash()
     {
     assert(hash_size_bytes>0);
     assert(0!=fp);
     assert(0==ferror(fp));
+    assert(window_size>0);
 
     uint32_t i;
     const char t[]="0123456789abcdef\0";
@@ -199,21 +208,99 @@ void Hasher::Write_Hash()
 
     for (i=0;i<hash_size_bytes;i++)
         {
-        hash_hex[i*2]=t[result[i]>>4];
-        hash_hex[i*2+1]=t[result[i]&0x0000000f];
+        hash_hex[i*2]=t[window_result[i]>>4];
+        hash_hex[i*2+1]=t[window_result[i]&0x0000000f];
         }
 
     hash_hex[i*2]=0;
 
-    if (fragment_size>0 && fragment_count>0)
+    if (window_size>0 && window_count>0)
         {
-        assert(fragment_count*fragment_size<=read_count);
-        fprintf(fp,"%"PRIu64" - %"PRIu64" %s\n",read_count-fragment_size,read_count-1,hash_hex);
+        assert(window_count*window_size<=read_count);
+        fprintf(fp,"%"PRIu64" - %"PRIu64": %s\n",read_count-window_size,read_count-1,hash_hex);
         }
     else
         {
-        fprintf(fp,"%u - %"PRIu64" %s\n",0,read_count-1,hash_hex);
+        fprintf(fp,"%u - %"PRIu64": %s\n",0,read_count-1,hash_hex);
         }
 
     fflush(fp);
+    }
+
+void Hasher::Write_Window_Hash_Footer()
+    {
+    assert(hash_size_bytes>0);
+    assert(0!=fp);
+    assert(0==ferror(fp));
+
+    fprintf(fp,"Total (%"PRIu64" bytes)\n",read_count);
+    }
+
+void Hasher::Write_Full_Hash()
+    {
+    assert(hash_size_bytes>0);
+    assert(0!=fp);
+    assert(0==ferror(fp));
+    assert(! windowed_only);
+
+    uint32_t i;
+    const char t[]="0123456789abcdef\0";
+    char hash_hex[hash_size_bytes*2+1];
+
+    for (i=0;i<hash_size_bytes;i++)
+        {
+        hash_hex[i*2]=t[full_result[i]>>4];
+        hash_hex[i*2+1]=t[full_result[i]&0x0000000f];
+        }
+
+    hash_hex[i*2]=0;
+
+    fprintf(fp,"Total (%"PRIu64" bytes): %s\n",read_count,hash_hex);
+
+    fflush(fp);
+    }
+
+void Hasher::Set_Windowed_Mode(bool win_only)
+    {
+    windowed_only=win_only;
+    }
+
+
+void Hasher::Update_States(const uint8_t *data, uint64_t data_size)
+    {
+    #pragma omp parallel sections
+        {
+        #pragma omp section
+            {
+            if(false==windowed_only)
+                {
+                Update_Full_State(data, data_size);
+                }
+            }
+        #pragma omp section
+            {
+            if(0!=window_size)
+                {
+                Update_Window_State(data, data_size);
+                }
+            }
+        }
+    }
+
+bool Hasher::Configure(const char *stream_name,
+                       const char *log_filepath,
+                       uint64_t win_size,
+                       bool win_only,
+                       Queue *q,
+                       uint64_t thread_processed_flag)
+    {
+    assert(0!=stream_name);
+    assert(0!=log_filepath);
+    assert(0!=q);
+    Set_Hashed_Stream_Name(stream_name);
+    Set_Window_Size(win_size);
+    Set_Windowed_Mode(win_only && 0!=win_size);
+    Set_Queue(q);
+    Set_Processed_Flag_Mask(thread_processed_flag);
+    return Open(log_filepath);
     }

@@ -34,23 +34,44 @@ class Hasher
     public:
         Hasher();
         virtual ~Hasher();
-        void Set_Queue(Queue *q);
-        void Set_Fragment_Size(uint64_t frag_size);
-        void Set_Processed_Flag_Mask(uint64_t mask);
-        void Set_Hashed_Stream_Name(const char *name);
-        bool Open(const char *filepath);
+        bool Configure(const char *stream_name,
+                       const char *log_filepath,
+                       uint64_t win_size,
+                       bool win_only,
+                       Queue *q,
+                       uint64_t thread_processed_flag);
         void Start();
 
     protected:
-        void Write_Header();
-        void Write_Hash();
-        virtual void Update_State(const uint8_t *data, uint64_t data_size)=0;
-        virtual void Calculate_Hash()=0;
-        virtual void Reset_Hash_State()=0;
+        virtual void Update_Full_State(const uint8_t *data, uint64_t data_size)=0;
+        virtual void Update_Window_State(const uint8_t *data, uint64_t data_size)=0;
+        virtual void Calculate_Window_Hash()=0;
+        virtual void Calculate_Full_Hash()=0;
+        virtual void Reset_Window_Hash_State()=0;
+        virtual void Reset_Full_Hash_State()=0;
+
+        enum HASHALGORITHM {none=0,md5=1, sha1=2, sha256=3, sha512=4};
+        HASHALGORITHM hash_algorithm;
+        uint32_t      hash_size_bytes;
 
         static const char     hash_name[][7];//={"none","md5","sha1","sha256","sha512"};
         static const uint32_t maximum_hash_result_size=64;
-        uint8_t               result[maximum_hash_result_size];
+        uint8_t               full_result[maximum_hash_result_size];
+        uint8_t               window_result[maximum_hash_result_size];
+
+    private:
+        void Set_Queue(Queue *q);
+        void Set_Window_Size(uint64_t win_size);
+        void Set_Processed_Flag_Mask(uint64_t thread_processed_flag);
+        void Set_Hashed_Stream_Name(const char *stream_name);
+        void Set_Windowed_Mode(bool win_only);
+        bool Open(const char *log_filepath);
+
+        void Update_States(const uint8_t *data, uint64_t data_size);
+        void Write_Header();
+        void Write_Window_Hash();
+        void Write_Full_Hash();
+        void Write_Window_Hash_Footer();
 
         Queue *queue;
         FILE  *fp;
@@ -59,15 +80,10 @@ class Hasher
         char                  hashed_stream_name[hashed_stream_name_size];
 
         uint64_t read_count;
-        uint64_t fragment_count;
-        uint64_t fragment_size;
+        uint64_t window_count;
+        uint64_t window_size;
         uint64_t processed_flag_mask;
-
-        enum HASHALGORITHM {none=0,md5=1, sha1=2, sha256=3, sha512=4};
-        HASHALGORITHM hash_algorithm;
-        uint32_t      hash_size_bytes;
-
-    private:
+        bool     windowed_only;
     };
 
 #endif // _HASHER_H_
