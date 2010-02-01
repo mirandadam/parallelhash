@@ -19,8 +19,8 @@
 Reader::Reader()
     {
 
-    qpool=0;
-    qpool_count=0;
+    hpool=0;
+    hpool_count=0;
     jpool=0;
     jpool_count=0;
     jpool_current=0;
@@ -102,24 +102,24 @@ bool Reader::Open(const char *filepath)
     return r;
     }
 
-void Reader::Set_Queue_Pool(Queue **queue_pool, uint32_t queue_pool_count)
+void Reader::Set_Hasher_Pool(Hasher **hasher_pool, uint32_t hasher_pool_count)
     {
 
     omp_set_lock(&reader_mutex);
 
     assert(!is_reading);
-    assert(queue_pool!=0);
-    assert(queue_pool_count!=0);
-    assert(queue_pool_count!=UINT32_MAX);
-    for(uint32_t i=0;i<queue_pool_count;i++)
+    assert(hasher_pool!=0);
+    assert(hasher_pool_count!=0);
+    assert(hasher_pool_count!=UINT32_MAX);
+    for(uint32_t i=0;i<hasher_pool_count;i++)
         {
-        assert(queue_pool[i]!=0);
+        assert(hasher_pool[i]!=0);
         }
 
-    qpool=queue_pool;
-    qpool_count=queue_pool_count;
+    hpool=hasher_pool;
+    hpool_count=hasher_pool_count;
 
-    unprocessed_flags=(1<<qpool_count)-1;
+    unprocessed_flags=(1<<hpool_count)-1;
     //printf("Queue unprocessed_flags: %"PRIo64"\n",unprocessed_flags);//DEBUG
 
     omp_unset_lock(&reader_mutex);
@@ -215,10 +215,10 @@ void Reader::Translate_Buffer_To_Jobs_And_Queue()
         c=c+jpool[i]->Set_Data(buffer+c,buffer_count-c);
         jpool[i]->Set_Unprocessed_Flags(unprocessed_flags);
 
-        for (j=0;j<qpool_count;j++)
+        for (j=0;j<hpool_count;j++)
             {
-            assert(qpool[j]!=0);
-            qpool[j]->Push(jpool[i]);
+            assert(hpool[j]!=0);
+            hpool[j]->queue.Push(jpool[i]);
             }
         }
     while (c<buffer_count);
@@ -236,15 +236,15 @@ void Reader::Check_Configuration()
     assert(0!=fp);
     assert(0!=jpool);
     assert(0<jpool_count);
-    assert(0!=qpool);
-    assert(0<qpool_count);
+    assert(0!=hpool);
+    assert(0<hpool_count);
     assert(jpool_current<jpool_count);
     max_depth=0;
 
-    for (i=0;i<qpool_count;i++)
+    for (i=0;i<hpool_count;i++)
         {
-        assert(qpool[i]!=0);
-        d=qpool[i]->Get_Capacity();
+        assert(hpool[i]!=0);
+        d=hpool[i]->queue.Get_Capacity();
         max_depth=(d>max_depth ? d : max_depth);
         }
 

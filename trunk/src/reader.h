@@ -24,6 +24,7 @@
 //#include <stdint.h>
 #include <assert.h>
 #include "queue.h"
+#include "hasher.h"
 
 class Reader
     {
@@ -32,7 +33,7 @@ class Reader
         Reader();
         virtual ~Reader();
         bool Open(const char *filepath);
-        void Set_Queue_Pool(Queue **queue_pool, uint32_t queue_pool_count);
+        void Set_Hasher_Pool(Hasher **hasher_pool, uint32_t hasher_pool_count);
         void Set_Job_Pool(Job **job_pool, uint32_t job_pool_count);
         bool Start();
         void Print_Status();
@@ -42,8 +43,8 @@ class Reader
         void Translate_Buffer_To_Jobs_And_Queue();
         uint32_t Get_Next_Recyclable_Job();
 
-        Queue**  qpool;
-        uint32_t qpool_count;
+        Hasher** hpool;
+        uint32_t hpool_count;
         Job**    jpool;
         uint32_t jpool_count;
         uint32_t jpool_current;

@@ -1,0 +1,2 @@
+implement writing to an output file
+implement displaying progress and instantaneous throughput
