@@ -38,9 +38,10 @@ class Hasher
                        const char *log_filepath,
                        uint64_t win_size,
                        bool win_only,
-                       Queue *q,
+//                       Queue *q,
                        uint64_t thread_processed_flag);
         void Start();
+        Queue queue;
 
     protected:
         virtual void Update_Full_State(const uint8_t *data, uint64_t data_size)=0;
@@ -73,7 +74,7 @@ class Hasher
         void Write_Full_Hash();
         void Write_Window_Hash_Footer();
 
-        Queue *queue;
+//        Queue *queue;
         FILE  *fp;
 
         static const uint32_t hashed_stream_name_size=128;

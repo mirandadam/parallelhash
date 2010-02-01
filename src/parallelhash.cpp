@@ -37,14 +37,16 @@ typedef struct
     char     *arg1; //hash algorithm
     char     *arg2; //log file
     char     *arg3; //hashwindow
-    char     *arg4; //"w[indowed]" or "p[artial]"for windowed hash only (do not calculate full hash)
+    char     *arg4; //"w[indowed]" or "p[artial]" for windowed hash only (do not calculate full hash)
     uint64_t hashwindow;
     bool     window_only;
     } arg_aux;
 
-uint32_t    hasher_count=0;   //number of hashing streams
-const char* input_filename=0; //name of the input file
-const char  stdin_filename[]={"-"};
+uint32_t    hasher_count=0;          //number of hashing streams
+const char* input_filename=0;        //name of the input file
+const char  stdin_filename[]={"-"};  //input file name to "read from stdin"
+const char* output_filename=0;       //name of the output file
+const char  stdout_filename[]={"-"}; //output file name to "write to stdout"
 bool        interactive=true; //flag to ask for confirmation before starting
 arg_aux     arguments[MAXIMUM_NUMBER_OF_HASHER_THREADS_PER_READER]; //arguments of the streams
 
@@ -53,10 +55,13 @@ void parse_command_line(int argc, char *argv[]);
 int main(int argc, char *argv[])
     {
     //TODO: change reader logic so it will wait until a job is free instead of bailing out.
-    Reader   reader;
-    Job*     job_pool[Queue::queue_size+2]={0};
-    Hasher*  hasher_pool[MAXIMUM_NUMBER_OF_HASHER_THREADS_PER_READER]={0};
-    Queue*   queue_pool[MAXIMUM_NUMBER_OF_HASHER_THREADS_PER_READER]={0};
+    Reader   reader; //this is the reader thread
+    //Writer   writer; //this is the writer thread
+    Job*     job_pool[Queue::queue_size+2]={0}; //the reader thread writes data to jobs in the pool and assigns them to queues. Jobs are recycled afterwards to avoid malloc/free or new/delete operations.
+    Hasher*  hasher_pool[MAXIMUM_NUMBER_OF_HASHER_THREADS_PER_READER]={0}; //these are the hasher threads. Every thread has a queue to process data from. The queue stores pointers to jobs.
+    //every job has an array of flags to keep track of every process that 
+    //TODO: change the processed flags to a counter.
+    //Queue*   queue_pool[MAXIMUM_NUMBER_OF_HASHER_THREADS_PER_READER]={0};
 
     uint32_t nthreads=0;
     bool     file_opened=true;
@@ -71,7 +76,7 @@ int main(int argc, char *argv[])
 
     for(uint32_t i=0;i<hasher_count;i++)
         {
-        queue_pool[i]=new Queue();
+        //queue_pool[i]=new Queue();
         if(0==strcmp("md5",arguments[i].arg1))
             {
             //printf("New md5 stream\n"); //DEBUG
@@ -97,7 +102,7 @@ int main(int argc, char *argv[])
                                               arguments[i].arg2,
                                               arguments[i].hashwindow,
                                               arguments[i].window_only,
-                                              queue_pool[i],
+                                              //queue_pool[i],
                                               1<<i);
         //hasher_pool[i]->Set_Queue(queue_pool[i]);
         //hasher_pool[i]->Set_Processed_Flag_Mask(1<<i);
@@ -113,7 +118,7 @@ int main(int argc, char *argv[])
 
     if(file_opened)
         {
-        reader.Set_Queue_Pool(queue_pool,hasher_count);
+        reader.Set_Hasher_Pool(hasher_pool,hasher_count);
         reader.Set_Job_Pool(job_pool,Queue::queue_size+2);
         file_opened=reader.Open(input_filename);
         if(! file_opened)
@@ -149,11 +154,13 @@ int main(int argc, char *argv[])
 
     for(uint32_t i=0;i<MAXIMUM_NUMBER_OF_HASHER_THREADS_PER_READER;i++)
         {
+/*
         if(0!=queue_pool[i])
             {
             delete queue_pool[i];
             queue_pool[i]=0;
             }
+*/
         if(0!=hasher_pool[i])
             {
             delete hasher_pool[i];
@@ -357,6 +364,26 @@ void parse_command_line(int argc, char* argv[])
                 }
 
             input_filename=argv[i+1];
+
+            i=i+1;
+            }
+        else if ( 0==strcmp(argv[i],"-o") || 0==strcmp(argv[i],"--output") )
+            {
+            if (0!=output_filename)
+                {
+                //error - output file defined twice
+                printf("Error. Output file defined twice. Use --output or -o only once.\n");
+                exit(1);
+                }
+
+            if (i+1>=argc)
+                {
+                //error - missing argument for option.
+                printf("Error. Missing argument for option %s. Use %s [file name].\n",argv[i],argv[i]);
+                exit(1);
+                }
+
+            output_filename=argv[i+1];
 
             i=i+1;
             }

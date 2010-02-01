@@ -23,7 +23,7 @@ Hasher::Hasher()
     memset (full_result,0,maximum_hash_result_size);
     memset (window_result,0,maximum_hash_result_size);
 
-    queue=0;
+    //queue=0;
     fp=0;
 
     memset (hashed_stream_name, 0, hashed_stream_name_size);
@@ -49,11 +49,13 @@ Hasher::~Hasher()
     }
 
 
+/*
 void Hasher::Set_Queue(Queue *q)
     {
     assert(0!=q);
     queue=q;
     }
+*/
 
 void Hasher::Set_Processed_Flag_Mask(uint64_t thread_processed_flag)
     {
@@ -95,7 +97,7 @@ void Hasher::Start()
     uint64_t      c=0,l=0;
 
     assert(hash_algorithm!=none);
-    assert(0!=queue);
+    //assert(0!=queue);
     assert(0!=fp);
     assert(0==ferror(fp));
     assert(0!=processed_flag_mask);
@@ -110,7 +112,7 @@ void Hasher::Start()
 
     do
         {
-        j=queue->Pop();
+        j=queue.Pop();
         j->Get_Data(&job_data,&job_data_size);
 
         if (job_data_size>0)
@@ -291,16 +293,16 @@ bool Hasher::Configure(const char *stream_name,
                        const char *log_filepath,
                        uint64_t win_size,
                        bool win_only,
-                       Queue *q,
+                       //Queue *q,
                        uint64_t thread_processed_flag)
     {
     assert(0!=stream_name);
     assert(0!=log_filepath);
-    assert(0!=q);
+    //assert(0!=q);
     Set_Hashed_Stream_Name(stream_name);
     Set_Window_Size(win_size);
     Set_Windowed_Mode(win_only && 0!=win_size);
-    Set_Queue(q);
+    //Set_Queue(q);
     Set_Processed_Flag_Mask(thread_processed_flag);
     return Open(log_filepath);
     }
