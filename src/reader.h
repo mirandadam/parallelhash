@@ -26,6 +26,8 @@
 #include "queue.h"
 #include "hasher.h"
 
+//the reader thread writes data to jobs in the pool and assigns them to queues.
+// Jobs are recycled afterwards to avoid malloc/free or new/delete operations.
 class Reader
     {
 
@@ -45,9 +47,11 @@ class Reader
 
         Hasher** hpool;
         uint32_t hpool_count;
-        Job**    jpool;
-        uint32_t jpool_count;
-        uint32_t jpool_current;
+
+        Job            job_pool[Queue::queue_size+2];
+        //Job**    jpool;
+        const uint32_t job_count;
+        uint32_t       job_current;
 
         FILE     *fp;
         bool     file_is_seekable;

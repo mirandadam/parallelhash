@@ -57,7 +57,6 @@ int main(int argc, char *argv[])
     //TODO: change reader logic so it will wait until a job is free instead of bailing out.
     Reader   reader; //this is the reader thread
     //Writer   writer; //this is the writer thread
-    Job*     job_pool[Queue::queue_size+2]={0}; //the reader thread writes data to jobs in the pool and assigns them to queues. Jobs are recycled afterwards to avoid malloc/free or new/delete operations.
     Hasher*  hasher_pool[MAXIMUM_NUMBER_OF_HASHER_THREADS_PER_READER]={0}; //these are the hasher threads. Every thread has a queue to process data from. The queue stores pointers to jobs.
     //every job has an array of flags to keep track of every process that 
     //TODO: change the processed flags to a counter.
@@ -68,11 +67,6 @@ int main(int argc, char *argv[])
 
     memset(arguments, 0, sizeof(arg_aux));
     parse_command_line(argc, argv);
-
-    for(uint32_t i=0;i<Queue::queue_size+2;i++)
-        {
-        job_pool[i]=new Job();
-        }
 
     for(uint32_t i=0;i<hasher_count;i++)
         {
@@ -112,7 +106,6 @@ int main(int argc, char *argv[])
     if(file_opened)
         {
         reader.Set_Hasher_Pool(hasher_pool,hasher_count);
-        reader.Set_Job_Pool(job_pool,Queue::queue_size+2);
         file_opened=reader.Open(input_filename);
         if(! file_opened)
             {
@@ -154,14 +147,6 @@ int main(int argc, char *argv[])
             }
         }
 
-    for(uint32_t i=0;i<Queue::queue_size+2;i++)
-        {
-        if(0!=job_pool[i])
-            {
-            delete job_pool[i];
-            job_pool[i]=0;
-            }
-        }
 
     return 0;
     }
