@@ -37,9 +37,7 @@ class Hasher
         bool Configure(const char *stream_name,
                        const char *log_filepath,
                        uint64_t win_size,
-                       bool win_only,
-//                       Queue *q,
-                       uint64_t thread_processed_flag);
+                       bool win_only);
         void Start();
         Queue queue;
 
@@ -63,7 +61,6 @@ class Hasher
     private:
         void Set_Queue(Queue *q);
         void Set_Window_Size(uint64_t win_size);
-        void Set_Processed_Flag_Mask(uint64_t thread_processed_flag);
         void Set_Hashed_Stream_Name(const char *stream_name);
         void Set_Windowed_Mode(bool win_only);
         bool Open(const char *log_filepath);
@@ -74,7 +71,6 @@ class Hasher
         void Write_Full_Hash();
         void Write_Window_Hash_Footer();
 
-//        Queue *queue;
         FILE  *fp;
 
         static const uint32_t hashed_stream_name_size=128;
@@ -83,7 +79,6 @@ class Hasher
         uint64_t read_count;
         uint64_t window_count;
         uint64_t window_size;
-        uint64_t processed_flag_mask;
         bool     windowed_only;
     };
 

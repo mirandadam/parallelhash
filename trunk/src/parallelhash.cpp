@@ -101,14 +101,7 @@ int main(int argc, char *argv[])
         file_opened=hasher_pool[i]->Configure(input_filename,
                                               arguments[i].arg2,
                                               arguments[i].hashwindow,
-                                              arguments[i].window_only,
-                                              //queue_pool[i],
-                                              1<<i);
-        //hasher_pool[i]->Set_Queue(queue_pool[i]);
-        //hasher_pool[i]->Set_Processed_Flag_Mask(1<<i);
-        //hasher_pool[i]->Set_Hashed_Stream_Name(input_filename);
-        //hasher_pool[i]->Set_Window_Size(arguments[i].hashwindow);
-        //file_opened=hasher_pool[i]->Open(arguments[i].arg2);
+                                              arguments[i].window_only);
         if(! file_opened)
             {
             printf("Error opening file for writing: %s\n",arguments[i].arg2);

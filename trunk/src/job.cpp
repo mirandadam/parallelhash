@@ -18,54 +18,43 @@
 
 Job::Job()
     {
-
-    unprocessed_flags=0;
+    pending_processing=0;
     data_count=0;
     omp_init_lock(&job_mutex);
-
     }
 
 Job::~Job()
     {
-
-    unprocessed_flags=0;
+    pending_processing=0;
     data_count=0;
     omp_destroy_lock(&job_mutex);
-
     }
 
-void Job::Set_Unprocessed_Flags(uint64_t value)
+void Job::Inc_Pending()
     {
-
     omp_set_lock(&job_mutex);
-    unprocessed_flags=value;
-    //printf("Job set unprocessed_flags=%i\n",value);//DEBUG
+    pending_processing++;
     omp_unset_lock(&job_mutex);
-
     }
 
-uint64_t Job::Get_Unprocessed_Flags()
+int32_t Job::Dec_And_Get_Pending()
     {
-
-    uint64_t r=0;
+    int32_t r;
     omp_set_lock(&job_mutex);
-    r=unprocessed_flags;
+    pending_processing--;
+    r=pending_processing;
     omp_unset_lock(&job_mutex);
-    //printf("Job get unprocessed_flags=%i\n",r); //DEBUG
-
+    assert(r>=0);
     return r;
     }
 
-void Job::Clear_Unprocessed_Flag_Bits(uint64_t mask)
+int32_t Job::Get_Pending()
     {
-
+    int32_t r;
     omp_set_lock(&job_mutex);
-    //printf("Before: %"PRIu64", mask=%"PRIu64" \n",unprocessed_flags,mask);
-    assert(0!=(unprocessed_flags & mask)); //there has to be some bit to clear, or else there is a programming mistake someplace.
-    unprocessed_flags= unprocessed_flags ^ (unprocessed_flags & mask) ;
-    //printf("After: %"PRIu64", mask=%"PRIu64" \n",unprocessed_flags,mask);
+    r=pending_processing;
     omp_unset_lock(&job_mutex);
-
+    return r;
     }
 
 uint64_t Job::Set_Data(const uint8_t *new_data, uint64_t new_data_count)
@@ -85,7 +74,7 @@ uint64_t Job::Set_Data(const uint8_t *new_data, uint64_t new_data_count)
 
     omp_set_lock(&job_mutex);
 
-    if (0==unprocessed_flags) //No writing unless the job has been marked as fully processed.
+    if (0==pending_processing) //No writing unless the job has been marked as fully processed.
         {
         data_count=0;
         memcpy(data,new_data,r);
