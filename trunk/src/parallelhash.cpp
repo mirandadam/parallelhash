@@ -147,13 +147,6 @@ int main(int argc, char *argv[])
 
     for(uint32_t i=0;i<MAXIMUM_NUMBER_OF_HASHER_THREADS_PER_READER;i++)
         {
-/*
-        if(0!=queue_pool[i])
-            {
-            delete queue_pool[i];
-            queue_pool[i]=0;
-            }
-*/
         if(0!=hasher_pool[i])
             {
             delete hasher_pool[i];
