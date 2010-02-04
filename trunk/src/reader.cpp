@@ -16,14 +16,16 @@
 
 #include "reader.h"
 
-Reader::Reader()
-    {
+//const uint32_t Reader::
 
+Reader::Reader()
+    : job_count(Queue::queue_size+2)
+    {
+    assert(0<job_count);
     hpool=0;
     hpool_count=0;
-    jpool=0;
-    jpool_count=0;
-    jpool_current=0;
+
+    job_current=0;
 
     fp=0;
     file_is_seekable=false;
@@ -120,25 +122,6 @@ void Reader::Set_Hasher_Pool(Hasher **hasher_pool, uint32_t hasher_pool_count)
     omp_unset_lock(&reader_mutex);
     }
 
-void Reader::Set_Job_Pool(Job **job_pool, uint32_t job_pool_count)
-    {
-    omp_set_lock(&reader_mutex);
-
-    assert(!is_reading);
-    assert(job_pool!=0);
-    assert(job_pool_count!=0);
-    assert(job_pool_count!=UINT32_MAX);
-    for(uint32_t i=0;i<job_pool_count;i++)
-        {
-        assert(job_pool[i]!=0);
-        }
-
-    jpool=job_pool;
-    jpool_count=job_pool_count;
-
-    omp_unset_lock(&reader_mutex);
-    }
-
 bool Reader::Start()
     {
 
@@ -205,14 +188,13 @@ void Reader::Translate_Buffer_To_Jobs_And_Queue()
     do
         {
         i=Get_Next_Recyclable_Job();
-        assert(jpool[i]!=0);
-        c=c+jpool[i]->Set_Data(buffer+c,buffer_count-c);
+        c=c+job_pool[i].Set_Data(buffer+c,buffer_count-c);
 
         for (j=0;j<hpool_count;j++)
             {
             assert(hpool[j]!=0);
-            jpool[i]->Inc_Pending();
-            hpool[j]->queue.Push(jpool[i]);
+            job_pool[i].Inc_Pending();
+            hpool[j]->queue.Push(&job_pool[i]);
             }
         }
     while (c<buffer_count);
@@ -228,11 +210,9 @@ void Reader::Check_Configuration()
 
     //consistency checking necessary before reading.
     assert(0!=fp);
-    assert(0!=jpool);
-    assert(0<jpool_count);
     assert(0!=hpool);
     assert(0<hpool_count);
-    assert(jpool_current<jpool_count);
+    assert(job_current<job_count);
     max_depth=0;
 
     for (i=0;i<hpool_count;i++)
@@ -242,7 +222,7 @@ void Reader::Check_Configuration()
         max_depth=(d>max_depth ? d : max_depth);
         }
 
-    assert(jpool_count>=max_depth+2); // the pool has to have enough jobs to fill the deepest queue.
+    assert(job_count>=max_depth+2); // the pool has to have enough jobs to fill the deepest queue.
 
     //TODO: document this requisite or change logic to make pool wait.
 
@@ -254,19 +234,18 @@ uint32_t Reader::Get_Next_Recyclable_Job()
     uint32_t i;
 
     //Find the first processed job in the pool to recycle:
-    i=(jpool_current+1)%jpool_count;
-    assert(jpool[i]!=0);
-    while (jpool[i]->Get_Pending()!=0 and jpool_current!=i)
+    i=(job_current+1)%job_count;
+    while (job_pool[i].Get_Pending()!=0 and job_current!=i)
         {
-        i=(i+1)%jpool_count;
+        i=(i+1)%job_count;
         }
 
-    assert(jpool[i]->Get_Pending()==0); //If this assertion fails,
+    assert(job_pool[i].Get_Pending()==0); //If this assertion fails,
     // it means that there are no processed jobs to recycle.
-    // is possible that a thread is not clearing a flag in the job.
+    // is possible that a thread is not decrementing the pending count in the job.
     // We already checked that there are enough jobs in the pool to fill
     // the deepest queue.
-    jpool_current=i;
+    job_current=i;
 
     return i;
     }
