@@ -25,6 +25,7 @@
 #include <assert.h>
 #include "queue.h"
 #include "hasher.h"
+#include "writer.h"
 
 //the reader thread writes data to jobs in the pool and assigns them to queues.
 // Jobs are recycled afterwards to avoid malloc/free or new/delete operations.
@@ -36,6 +37,7 @@ class Reader
         virtual ~Reader();
         bool Open(const char *filepath);
         void Set_Hasher_Pool(Hasher **hasher_pool, uint32_t hasher_pool_count);
+        void Set_Writer(Writer *w);
         void Set_Job_Pool(Job **job_pool, uint32_t job_pool_count);
         bool Start();
         void Print_Status();
@@ -47,6 +49,8 @@ class Reader
 
         Hasher** hpool;
         uint32_t hpool_count;
+
+        Writer*  writer;
 
         Job            job_pool[Queue::queue_size+2];
         //Job**    jpool;

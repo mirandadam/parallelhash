@@ -59,7 +59,6 @@ class Hasher
         uint8_t               window_result[maximum_hash_result_size];
 
     private:
-        void Set_Queue(Queue *q);
         void Set_Window_Size(uint64_t win_size);
         void Set_Hashed_Stream_Name(const char *stream_name);
         void Set_Windowed_Mode(bool win_only);
