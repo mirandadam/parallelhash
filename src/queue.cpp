@@ -145,8 +145,10 @@ uint32_t Queue::Get_Capacity()
  */
 uint32_t Queue::Get_Job_Count()
     {
+    uint_32_t r;
     omp_set_lock(&queue_mutex);
-    return queue_count;
+    r=queue_count;
     omp_unset_lock(&queue_mutex);
+    return r;
     }
 
