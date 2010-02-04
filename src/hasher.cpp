@@ -23,7 +23,6 @@ Hasher::Hasher()
     memset (full_result,0,maximum_hash_result_size);
     memset (window_result,0,maximum_hash_result_size);
 
-    //queue=0;
     fp=0;
 
     memset (hashed_stream_name, 0, hashed_stream_name_size);
@@ -31,7 +30,6 @@ Hasher::Hasher()
     read_count=0;
     window_count=0;
     window_size=0; //Default - entire stream.
-    processed_flag_mask=0;
     windowed_only=false;
 
     hash_algorithm=none;
@@ -46,32 +44,6 @@ Hasher::~Hasher()
         fclose(fp);
         fp=0;
         }
-    }
-
-
-/*
-void Hasher::Set_Queue(Queue *q)
-    {
-    assert(0!=q);
-    queue=q;
-    }
-*/
-
-void Hasher::Set_Processed_Flag_Mask(uint64_t thread_processed_flag)
-    {
-    uint64_t i;
-    uint32_t j;
-    //counting the bits set in the mask:
-    j=0;
-
-    for (i=thread_processed_flag; 0!=i; i=i>>1)
-        {
-        j=j+(i & 1);
-        }
-
-    assert(1==j); //exactly one bit set.
-
-    processed_flag_mask=thread_processed_flag;
     }
 
 bool Hasher::Open(const char *filepath)
@@ -97,10 +69,8 @@ void Hasher::Start()
     uint64_t      c=0,l=0;
 
     assert(hash_algorithm!=none);
-    //assert(0!=queue);
     assert(0!=fp);
     assert(0==ferror(fp));
-    assert(0!=processed_flag_mask);
     assert(! (0==window_size && windowed_only));
 
     Write_Header();
@@ -146,7 +116,7 @@ void Hasher::Start()
                 }
             }
 
-        j->Clear_Unprocessed_Flag_Bits(processed_flag_mask);
+        j->Dec_And_Get_Pending();
         }
     while (job_data_size>0);
 
@@ -292,17 +262,12 @@ void Hasher::Update_States(const uint8_t *data, uint64_t data_size)
 bool Hasher::Configure(const char *stream_name,
                        const char *log_filepath,
                        uint64_t win_size,
-                       bool win_only,
-                       //Queue *q,
-                       uint64_t thread_processed_flag)
+                       bool win_only)
     {
     assert(0!=stream_name);
     assert(0!=log_filepath);
-    //assert(0!=q);
     Set_Hashed_Stream_Name(stream_name);
     Set_Window_Size(win_size);
     Set_Windowed_Mode(win_only && 0!=win_size);
-    //Set_Queue(q);
-    Set_Processed_Flag_Mask(thread_processed_flag);
     return Open(log_filepath);
     }

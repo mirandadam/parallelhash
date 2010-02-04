@@ -31,14 +31,14 @@ class Job
     public:
         Job();
         virtual ~Job();
-        void      Set_Unprocessed_Flags(uint64_t value);
-        uint64_t  Get_Unprocessed_Flags();
-        void      Clear_Unprocessed_Flag_Bits(uint64_t mask);
+        void      Inc_Pending();
+        int32_t   Dec_And_Get_Pending();
+        int32_t   Get_Pending();
         uint64_t  Set_Data(const uint8_t *new_data, uint64_t new_data_count);
         void      Get_Data(const uint8_t** data_pointer, uint64_t *data_pointer_count);
 
     protected:
-        uint64_t               unprocessed_flags;
+        int32_t                pending_processing;
         static const uint64_t  data_size=32*1024;
         uint8_t                data[data_size];
         uint64_t               data_count;

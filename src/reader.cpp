@@ -24,7 +24,6 @@ Reader::Reader()
     jpool=0;
     jpool_count=0;
     jpool_current=0;
-    unprocessed_flags=0;
 
     fp=0;
     file_is_seekable=false;
@@ -104,7 +103,6 @@ bool Reader::Open(const char *filepath)
 
 void Reader::Set_Hasher_Pool(Hasher **hasher_pool, uint32_t hasher_pool_count)
     {
-
     omp_set_lock(&reader_mutex);
 
     assert(!is_reading);
@@ -119,17 +117,13 @@ void Reader::Set_Hasher_Pool(Hasher **hasher_pool, uint32_t hasher_pool_count)
     hpool=hasher_pool;
     hpool_count=hasher_pool_count;
 
-    unprocessed_flags=(1<<hpool_count)-1;
-    //printf("Queue unprocessed_flags: %"PRIo64"\n",unprocessed_flags);//DEBUG
-
     omp_unset_lock(&reader_mutex);
-
     }
 
 void Reader::Set_Job_Pool(Job **job_pool, uint32_t job_pool_count)
     {
-
     omp_set_lock(&reader_mutex);
+
     assert(!is_reading);
     assert(job_pool!=0);
     assert(job_pool_count!=0);
@@ -141,8 +135,8 @@ void Reader::Set_Job_Pool(Job **job_pool, uint32_t job_pool_count)
 
     jpool=job_pool;
     jpool_count=job_pool_count;
-    omp_unset_lock(&reader_mutex);
 
+    omp_unset_lock(&reader_mutex);
     }
 
 bool Reader::Start()
@@ -213,11 +207,11 @@ void Reader::Translate_Buffer_To_Jobs_And_Queue()
         i=Get_Next_Recyclable_Job();
         assert(jpool[i]!=0);
         c=c+jpool[i]->Set_Data(buffer+c,buffer_count-c);
-        jpool[i]->Set_Unprocessed_Flags(unprocessed_flags);
 
         for (j=0;j<hpool_count;j++)
             {
             assert(hpool[j]!=0);
+            jpool[i]->Inc_Pending();
             hpool[j]->queue.Push(jpool[i]);
             }
         }
@@ -262,12 +256,12 @@ uint32_t Reader::Get_Next_Recyclable_Job()
     //Find the first processed job in the pool to recycle:
     i=(jpool_current+1)%jpool_count;
     assert(jpool[i]!=0);
-    while (jpool[i]->Get_Unprocessed_Flags()!=0 and jpool_current!=i)
+    while (jpool[i]->Get_Pending()!=0 and jpool_current!=i)
         {
         i=(i+1)%jpool_count;
         }
 
-    assert(jpool[i]->Get_Unprocessed_Flags()==0); //If this assertion fails,
+    assert(jpool[i]->Get_Pending()==0); //If this assertion fails,
     // it means that there are no processed jobs to recycle.
     // is possible that a thread is not clearing a flag in the job.
     // We already checked that there are enough jobs in the pool to fill

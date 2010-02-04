@@ -48,7 +48,6 @@ class Reader
         Job**    jpool;
         uint32_t jpool_count;
         uint32_t jpool_current;
-        uint64_t unprocessed_flags;
 
         FILE     *fp;
         bool     file_is_seekable;
