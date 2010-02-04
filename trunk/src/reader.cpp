@@ -38,6 +38,8 @@ Reader::Reader()
 
     omp_init_lock(&reader_mutex);
 
+    writer=0;
+
     }
 
 Reader::~Reader()
@@ -122,6 +124,16 @@ void Reader::Set_Hasher_Pool(Hasher **hasher_pool, uint32_t hasher_pool_count)
     omp_unset_lock(&reader_mutex);
     }
 
+void Reader::Set_Writer(Writer *w)
+    {
+    omp_set_lock(&reader_mutex);
+
+    assert(0!=w);
+    writer=w;
+
+    omp_unset_lock(&reader_mutex);
+    }
+
 bool Reader::Start()
     {
 
@@ -171,7 +183,7 @@ void Reader::Print_Status()
     {
 
     omp_set_lock(&reader_mutex);
-    printf("File size:%"PRIu64" Read:%"PRIu64"\n",file_size,read_count);
+    fprintf(stderr,"File size:%"PRIu64" Read:%"PRIu64"\n",file_size,read_count);
     omp_unset_lock(&reader_mutex);
 
     }
@@ -195,6 +207,11 @@ void Reader::Translate_Buffer_To_Jobs_And_Queue()
             assert(hpool[j]!=0);
             job_pool[i].Inc_Pending();
             hpool[j]->queue.Push(&job_pool[i]);
+            }
+        if(0!=writer)
+            {
+            job_pool[i].Inc_Pending();
+            writer->queue.Push(&job_pool[i]);
             }
         }
     while (c<buffer_count);
