@@ -1,2 +1,8 @@
-implement writing to an output file
 implement displaying progress and instantaneous throughput
+choose a build infrastructure ('make'?)
+register interruption handlers
+try to compile in windows (what to use? mingw?)
+write usage documentation, revise command line arguments
+write code documentation after cleanup
+release binary files for windows and linux
+FIX: only warn about overwriting files if the files exist
