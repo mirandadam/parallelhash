@@ -78,6 +78,7 @@ void Hasher::Start()
     Reset_Window_Hash_State();
     Reset_Full_Hash_State();
     read_count=0;
+    previous_read_count=0;
     window_count=0;
 
     do
@@ -102,6 +103,7 @@ void Hasher::Start()
                     read_count+=l;
                     Calculate_Window_Hash();
                     Write_Window_Hash();
+                    previous_read_count=read_count;
                     Reset_Window_Hash_State();
                     }
 
@@ -129,6 +131,7 @@ void Hasher::Start()
             {
             Calculate_Window_Hash();
             Write_Window_Hash();
+            previous_read_count=read_count;
             }
         }
 
@@ -189,7 +192,7 @@ void Hasher::Write_Window_Hash()
     if (window_size>0 && window_count>0)
         {
         assert(window_count*window_size<=read_count);
-        fprintf(fp,"%"PRIu64" - %"PRIu64": %s\n",read_count-window_size,read_count-1,hash_hex);
+        fprintf(fp,"%"PRIu64" - %"PRIu64": %s\n",previous_read_count,read_count-1,hash_hex);
         }
     else
         {

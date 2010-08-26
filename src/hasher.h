@@ -76,6 +76,7 @@ class Hasher
         char                  hashed_stream_name[hashed_stream_name_size];
 
         uint64_t read_count;
+        uint64_t previous_read_count;
         uint64_t window_count;
         uint64_t window_size;
         bool     windowed_only;
