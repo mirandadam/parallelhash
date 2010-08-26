@@ -593,7 +593,10 @@ void parse_command_line(int argc, char* argv[])
             fprintf(stderr,"\n");
             }
         fprintf(stderr,"Existing logs will be overwritten. Do you wish to continue? (y/n)\n");
-        scanf("%c",&c);
+        if(1!=scanf("%c",&c)) //we test the scanf result just to avoid a compilation warning. It is not really necessary.
+            {
+            exit(1);
+            }
         if('y'!=c && 'Y'!=c)
             {
             exit(1);

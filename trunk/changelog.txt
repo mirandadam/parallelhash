@@ -1,3 +1,7 @@
+trunk
+  - fixed printing wrong start byte at the last window when file size was not a multiple of the window. Hash value was correct, though. (2010-10-26)
+  - fixed compilation warning for not checking scanf return value (2010-10-26)
+
 0.2 alpha (2009-11-08)
   - fixed warnings that were still present with -Wextra
   - added support for command line options --md5, --sha1, etc.
