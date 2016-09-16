@@ -8,5 +8,5 @@ Features:
 * faster than dcfldd
 * md5, sha1, sha256, sha512
 * simultaneous hash calculations
-* configurable partial hashes
-* separated log files
+* configurable partial hashes (compute a digest for each file segment)
+* write output to separate log files
